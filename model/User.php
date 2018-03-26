@@ -8,23 +8,25 @@
  */
 class User
 {
-    private $email;
-    private $password;
+    public $email;
+    public $password;
     public $password2;
     public $users;
     public $errors = array();
-    public function checkUser()
+
+    public function checkEmail()
     {
         $conn = Db::connect();
-        $sql = 'SELECT * FROM users WHERE username = :email';
+        $sql = 'SELECT * FROM users WHERE e_mail = :email';
         $result = $conn->prepare($sql);
         $result->bindParam(':email', $this->email, PDO::PARAM_STR);
         $result->execute();
-        if($result->fetchColumn()){
+        if ($result->fetchColumn()) {
             return true;
             return false;
         }
     }
+
     public function register($email, $password, $password2)
     {
         $this->email = $email;
@@ -34,58 +36,85 @@ class User
         if ($password2 != $password) {
             $this->errors[] = "Paswords not equal";
         }
-        if($this->checkUser()){
-            $this->errors[] ="User olredy exists";
+        if (!preg_match('/[A-z0-9]{5,30}$/', $password)) {
+            $this->errors[] = "Paswords not equal";
+        }
+        $this->password = md5($password);
+
+        if ($this->checkEmail()) {
+            $this->errors[] = "email olredy exists";
         }
         if (!$this->errors) {
-            $conn =Db::connect();
-            $sql = "INSERT INTO users(email, password)
+            $conn = Db::connect();
+            $sql = "INSERT INTO users(e_mail, password)
     VALUES (:email,:pass)";
             // use exec() because no results are returned
             $res = $conn->prepare($sql);
-            $res->bindParam(':email', $this->login, PDO::PARAM_STR);
+            $res->bindParam(':email', $this->email, PDO::PARAM_STR);
             $res->bindParam(':pass', $this->password, PDO::PARAM_STR);
 
             $res->execute();
-            //
-            $_SESSION['user']=$this->login;
-            header("Location: /index");
-        }else{
+
+            $_SESSION['user'] = $this->email;
+            echo "<br> succsess register<br>";
+
+        } else {
             echo $this->errors[0];
         }
     }
 
-    public function login($email,$password)
+    public function login($email, $password)
     {
         $this->email = $email;
-        $this->password = $password;
-        $conn =Db::connect();
-        $sql = 'SELECT * FROM users WHERE email = email AND password=:pass';
+        $this->password = md5($password);
+        $conn = Db::connect();
+        $sql = 'SELECT * FROM users WHERE e_mail = :email AND password=:pass';
         $result = $conn->prepare($sql);
         $result->bindParam(':email', $this->email, PDO::PARAM_STR);
         $result->bindParam(':pass', $this->password, PDO::PARAM_STR);
-        $result->setFetchMode(PDO::FETCH_ASSOC);
+        //$result->setFetchMode(PDO::FETCH_ASSOC);
         $result->execute();
-        $user = $result->fetch();
-        // var_dump($user);
-        if($user!=null){
-            $_SESSION['user']=$this->email;
-            $_SESSION['user_id']=$user['id'];
-            // var_dump($_SESSION);
-            header("Location: /dashboard");
+        //var_dump($res);
+        $user = $result->fetch(PDO::FETCH_ASSOC);
+
+        if ($user != null) {
+            echo "<br> Hello user with id ".$user['id']."<br>";
+            echo "<br>Your last wisit is" . $user['last_visit'];
+            $_SESSION['id']=$user['id'];
+
+
             return true;
             return false;
+
+
         }
-        if(!$user){
-            echo $this->errors[]="logim or pass invalid";
+        if (!$user) {
+            echo $this->errors[] = "logim or pass invalid";
             return $this->errors[0];
         }
+
+        
+
     }
 
-    public function logout(){
-        session_destroy();
-        header('Location:index');
+    public function updatelastVisit($id)
+    {
+
+        $conn = Db::connect();
+        $sql = "UPDATE  users SET last_visit= :last_visit WHERE id=:id";
+        $result = $conn->prepare($sql);
+        $result->bindParam(':id', $id, PDO::PARAM_INT);
+        $result->bindParam(':last_visit', date("y-m-d H:i:s"), PDO::PARAM_INT);
+        
+        return $result->execute();
     }
 
+    public function logout($id){
+
+        $this->updatelastVisit($id);
+
+       session_destroy();
+
+    }
 
 }
